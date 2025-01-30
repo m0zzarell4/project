@@ -1,118 +1,109 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 
-namespace LibrarySystem
+namespace project
 {
-    public class StorageHandler
+    public class FileStorageManager
     {
-        private const string BOOKS_FILE = "LibraryBooks.txt";
-        private const string READERS_FILE = "LibraryReaders.txt";
-        private const string LOANS_FILE = "LibraryLoans.txt";
-        private static char DELIMITER = '|';
+        private const string BOOKS_FILE = "Books.txt";
+        private const string READERS_FILE = "Readers.txt";
+        private const string LOANS_FILE = "Loans.txt";
+        private static char SEP = ';';
 
-        public static List<Book> LoadBooks()
+        // Helper method for loading data from file
+        private static List<T> LoadFromFile<T>(string filePath, Func<string[], T> createItem)
         {
-            List<Book> books = new List<Book>();
-            if (!File.Exists(BOOKS_FILE)) return books;
+            List<T> items = new List<T>();
 
-            foreach (var line in File.ReadLines(BOOKS_FILE))
+            if (!File.Exists(filePath)) return items;
+
+            var lines = File.ReadAllLines(filePath);
+            foreach (var line in lines)
             {
                 if (string.IsNullOrWhiteSpace(line)) continue;
-                var data = line.Split(DELIMITER);
-                if (data.Length >= 5)
+
+                var parts = line.Split(SEP);
+                if (parts.Length >= 1)
                 {
-                    books.Add(new Book
-                    {
-                        Id = int.Parse(data[0]),
-                        Title = data[1],
-                        Author = data[2],
-                        PublicationYear = int.Parse(data[3]),
-                        IsAvailable = bool.Parse(data[4])
-                    });
+                    items.Add(createItem(parts));
                 }
             }
-            return books;
+            return items;
+        }
+
+        // KSIĄŻKI
+        public static List<Book> LoadBooks()
+        {
+            return LoadFromFile(BOOKS_FILE, parts =>
+            {
+                return new Book
+                {
+                    Id = int.Parse(parts[0]),
+                    Title = parts[1],
+                    Author = parts[2],
+                    PublicationYear = int.Parse(parts[3]),
+                    IsAvailable = bool.Parse(parts[4])
+                };
+            });
         }
 
         public static void SaveBooks(List<Book> books)
         {
-            using (StreamWriter writer = new StreamWriter(BOOKS_FILE, false))
-            {
-                foreach (var book in books)
-                {
-                    writer.WriteLine($"{book.Id}{DELIMITER}{book.Title}{DELIMITER}{book.Author}{DELIMITER}{book.PublicationYear}{DELIMITER}{book.IsAvailable}");
-                }
-            }
+            SaveToFile(BOOKS_FILE, books, b => $"{b.Id}{SEP}{b.Title}{SEP}{b.Author}{SEP}{b.PublicationYear}{SEP}{b.IsAvailable}");
         }
 
+        // CZYTELNICY
         public static List<Reader> LoadReaders()
         {
-            List<Reader> readers = new List<Reader>();
-            if (!File.Exists(READERS_FILE)) return readers;
-
-            foreach (var line in File.ReadLines(READERS_FILE))
+            return LoadFromFile(READERS_FILE, parts =>
             {
-                if (string.IsNullOrWhiteSpace(line)) continue;
-                var data = line.Split(DELIMITER);
-                if (data.Length >= 3)
+                return new Reader
                 {
-                    readers.Add(new Reader
-                    {
-                        Id = int.Parse(data[0]),
-                        FirstName = data[1],
-                        LastName = data[2]
-                    });
-                }
-            }
-            return readers;
+                    Id = int.Parse(parts[0]),
+                    FName = parts[1],
+                    LName = parts[2]
+                };
+            });
         }
 
         public static void SaveReaders(List<Reader> readers)
         {
-            using (StreamWriter writer = new StreamWriter(READERS_FILE, false))
-            {
-                foreach (var reader in readers)
-                {
-                    writer.WriteLine($"{reader.Id}{DELIMITER}{reader.FirstName}{DELIMITER}{reader.LastName}");
-                }
-            }
+            SaveToFile(READERS_FILE, readers, r => $"{r.Id}{SEP}{r.FName}{SEP}{r.LName}");
         }
 
+        // POŻYCZKI
         public static List<Loan> LoadLoans()
         {
-            List<Loan> loans = new List<Loan>();
-            if (!File.Exists(LOANS_FILE)) return loans;
-
-            foreach (var line in File.ReadLines(LOANS_FILE))
+            return LoadFromFile(LOANS_FILE, parts =>
             {
-                if (string.IsNullOrWhiteSpace(line)) continue;
-                var data = line.Split(DELIMITER);
-                if (data.Length >= 7)
+                return new Loan
                 {
-                    loans.Add(new Loan
-                    {
-                        LoanId = int.Parse(data[0]),
-                        BookId = int.Parse(data[1]),
-                        ReaderId = int.Parse(data[2]),
-                        BorrowDate = DateTime.Parse(data[3]),
-                        DueDate = DateTime.Parse(data[4]),
-                        ReturnDate = string.IsNullOrEmpty(data[5]) ? (DateTime?)null : DateTime.Parse(data[5]),
-                        Penalty = double.Parse(data[6])
-                    });
-                }
-            }
-            return loans;
+                    LoanId = int.Parse(parts[0]),
+                    BookId = int.Parse(parts[1]),
+                    ReaderId = int.Parse(parts[2]),
+                    BorrowDate = DateTime.Parse(parts[3]),
+                    DueDate = DateTime.Parse(parts[4]),
+                    ReturnDate = string.IsNullOrEmpty(parts[5]) ? (DateTime?)null : DateTime.Parse(parts[5]),
+                    Penalty = double.Parse(parts[6])
+                };
+            });
         }
 
         public static void SaveLoans(List<Loan> loans)
         {
-            using (StreamWriter writer = new StreamWriter(LOANS_FILE, false))
+            SaveToFile(LOANS_FILE, loans, ln => $"{ln.LoanId}{SEP}{ln.BookId}{SEP}{ln.ReaderId}{SEP}{ln.BorrowDate}{SEP}{ln.DueDate}{SEP}{(ln.ReturnDate?.ToString() ?? "")}{SEP}{ln.Penalty}");
+        }
+
+        // Helper method for saving data to a file
+        private static void SaveToFile<T>(string filePath, List<T> items, Func<T, string> formatItem)
+        {
+            using (StreamWriter sw = new StreamWriter(filePath, false))
             {
-                foreach (var loan in loans)
+                foreach (var item in items)
                 {
-                    string returnDate = loan.ReturnDate.HasValue ? loan.ReturnDate.Value.ToString() : "";
-                    writer.WriteLine($"{loan.LoanId}{DELIMITER}{loan.BookId}{DELIMITER}{loan.ReaderId}{DELIMITER}{loan.BorrowDate}{DELIMITER}{loan.DueDate}{DELIMITER}{returnDate}{DELIMITER}{loan.Penalty}");
+                    sw.WriteLine(formatItem(item));
                 }
             }
         }
